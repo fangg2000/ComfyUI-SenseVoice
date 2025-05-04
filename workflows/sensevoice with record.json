@@ -1,0 +1,261 @@
+{
+  "id": "5e2d47ff-55db-47ca-a75c-e11b76a2b386",
+  "revision": 0,
+  "last_node_id": 9,
+  "last_link_id": 8,
+  "nodes": [
+    {
+      "id": 8,
+      "type": "SwitchByIndex",
+      "pos": [
+        -500.6825256347656,
+        -1167.4864501953125
+      ],
+      "size": [
+        243.60000610351562,
+        102
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "A",
+          "shape": 7,
+          "type": "*",
+          "link": 7
+        },
+        {
+          "name": "B",
+          "shape": 7,
+          "type": "*",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "list",
+          "shape": 6,
+          "type": "*",
+          "links": [
+            8
+          ]
+        },
+        {
+          "name": "count",
+          "type": "INT",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-mixlab-nodes",
+        "ver": "b2bb1876def6330fccf1e03cc69d2166cae7bedb",
+        "Node name for S&R": "SwitchByIndex"
+      },
+      "widgets_values": [
+        0,
+        "off"
+      ]
+    },
+    {
+      "id": 2,
+      "type": "STTNode",
+      "pos": [
+        -572.0827026367188,
+        -987.4580688476562
+      ],
+      "size": [
+        315,
+        82
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "audio_path",
+          "type": "STRING",
+          "widget": {
+            "name": "audio_path"
+          },
+          "link": 8
+        }
+      ],
+      "outputs": [
+        {
+          "name": "list_string",
+          "type": "LIST",
+          "links": [
+            5
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "STTNode"
+      },
+      "widgets_values": [
+        "",
+        30
+      ]
+    },
+    {
+      "id": 6,
+      "type": "Text List to Text",
+      "pos": [
+        -203.29383850097656,
+        -990.4685668945312
+      ],
+      "size": [
+        315,
+        58
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "text_list",
+          "type": "LIST",
+          "link": 5
+        }
+      ],
+      "outputs": [
+        {
+          "name": "STRING",
+          "type": "STRING",
+          "links": [
+            6
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Text List to Text"
+      },
+      "widgets_values": [
+        ""
+      ]
+    },
+    {
+      "id": 7,
+      "type": "ShowText|pysssss",
+      "pos": [
+        -201.16943359375,
+        -848.1470947265625
+      ],
+      "size": [
+        437.2900390625,
+        100.34717559814453
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "text",
+          "type": "STRING",
+          "link": 6
+        }
+      ],
+      "outputs": [
+        {
+          "name": "STRING",
+          "shape": 6,
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-custom-scripts",
+        "ver": "2c09d59ab5ac27ac59022832bfde4eeeb9c55825",
+        "Node name for S&R": "ShowText|pysssss"
+      },
+      "widgets_values": [
+        "喂，你好，听到吗？喂。"
+      ]
+    },
+    {
+      "id": 4,
+      "type": "VoiceRecorderNode",
+      "pos": [
+        -881.523193359375,
+        -1167.2630615234375
+      ],
+      "size": [
+        342.5999755859375,
+        106
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "file_path_list",
+          "type": "LIST",
+          "links": [
+            7
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VoiceRecorderNode"
+      },
+      "widgets_values": [
+        "/home/fangg/other/tts/ComfyUI/output",
+        true,
+        5
+      ]
+    }
+  ],
+  "links": [
+    [
+      5,
+      2,
+      0,
+      6,
+      0,
+      "LIST"
+    ],
+    [
+      6,
+      6,
+      0,
+      7,
+      0,
+      "STRING"
+    ],
+    [
+      7,
+      4,
+      0,
+      8,
+      0,
+      "*"
+    ],
+    [
+      8,
+      8,
+      0,
+      2,
+      0,
+      "STRING"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 1.2839025177495011,
+      "offset": [
+        1074.6494439854443,
+        1431.883132673131
+      ]
+    },
+    "frontendVersion": "1.17.11",
+    "VHS_latentpreview": false,
+    "VHS_latentpreviewrate": 0,
+    "VHS_MetadataImage": true,
+    "VHS_KeepIntermediate": true
+  },
+  "version": 0.4
+}

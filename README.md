@@ -1,2 +1,11 @@
-# ComfyUI-SenseVoice
-基于SenseVoice项目在comfyui的音频转文本处理，项目还写了个录音的节点（本人能力有限，搞了一天只能这样了）
+# SenseVoice-ComfyUI
+a custom node for SenseVoice
+
+## How to use
+```
+## in ComfyUI/custom_nodes
+git clone https://github.com/AIFSH/SenseVoice-ComfyUI.git
+cd SenseVoice-ComfyUI
+pip install -r requirements.txt
+```
+weights will be downloaded from modelscope
