@@ -18,7 +18,7 @@ now_dir = os.path.dirname(os.path.abspath(__file__))
 
 # 注册节点
 class VoiceRecorderNode:
-    CATEGORY = "fg/录音工具"
+    CATEGORY = "fg/Record Node"
     RETURN_TYPES = ("LIST",)
     RETURN_NAMES = ("file_path_list",)
     FUNCTION = "process_record"
@@ -44,12 +44,18 @@ class VoiceRecorderNode:
             "required": {
                 "folder": ("STRING", {"directory": True, "default": "./ComfyUI/temp"}),
                 "wait_for_seconds": ("INT", {"default": 1, "min": 0, "max": 5}),
-                "record_seconds": ("FLOAT", {"default": 5.0, "min": 1.0, "max": 360.0}),
+                "sample_rate": ([8000, 16000, 22050, 44100, 48000], {
+                    "default": 16000
+                }),
+                "record_seconds": ("FLOAT", {"default": 5.0, "min": 1.0, "max": 360.0, "step": 1.0}),
                 "remove_file": ("BOOLEAN", {"default": False})
             },
         }
 
-    def process_record(self, folder, wait_for_seconds, record_seconds, remove_file):
+    def process_record(self, folder, wait_for_seconds, sample_rate, record_seconds, remove_file):
+        # 采样率
+        self.fs = sample_rate
+
         try:
             # 创建保存目录
             os.makedirs(folder, exist_ok=True)
@@ -85,7 +91,7 @@ class VoiceRecorderNode:
                 self.audio_path = None
 
     def remove_audio_file(self):
-        print("开始删除文件")
+        print(f"删除音频文件--{self.audio_path}")
         os.remove(self.audio_path)
         self.audio_path = None
 
@@ -189,7 +195,7 @@ class STTNode:
         # 使用示例
         # comfyui_root = get_comfyui_root()
         comfyui_root = None
-        print("ComfyUI根目录:", comfyui_root)
+        # print("ComfyUI根目录:", comfyui_root)
 
         try:
             if comfyui_root is None:
