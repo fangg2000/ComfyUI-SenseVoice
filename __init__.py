@@ -1,5 +1,5 @@
 import os
-now_dir = os.path.dirname(os.path.abspath(__file__))
+import sys
 import sounddevice as sd
 import numpy as np
 import time
@@ -13,9 +13,8 @@ from modelscope import snapshot_download
 from scipy.io.wavfile import write
 from datetime import datetime
 
+now_dir = os.path.dirname(os.path.abspath(__file__))
 
-pre_model_dir = os.path.join(now_dir,"pretrianed_models","SenseVoiceSmall")
-snapshot_download(model_id="iic/SenseVoiceSmall",local_dir=pre_model_dir)
 
 # 注册节点
 class VoiceRecorderNode:
@@ -43,40 +42,52 @@ class VoiceRecorderNode:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "folder": ("STRING", {"directory": True, "default":"./ComfyUI/output"}),
-                "enable_processing": ("BOOLEAN", {"default": False}),
-                "record_seconds": ("FLOAT", {"default": 10.0, "min":1.0, "max":360.0})
+                "folder": ("STRING", {"directory": True, "default": "./ComfyUI/temp"}),
+                "wait_for_seconds": ("INT", {"default": 1, "min": 0, "max": 5}),
+                "record_seconds": ("FLOAT", {"default": 5.0, "min": 1.0, "max": 360.0}),
+                "remove_file": ("BOOLEAN", {"default": False})
             },
         }
 
-    def process_record(self, folder, enable_processing, record_seconds):
+    def process_record(self, folder, wait_for_seconds, record_seconds, remove_file):
         try:
             # 创建保存目录
             os.makedirs(folder, exist_ok=True)
             self.save_dir = folder
 
-            # 状态切换逻辑
-            if enable_processing:
-                # 启动一个定时器，在10秒后调用函数
-                timer = threading.Timer(record_seconds, self.stop_recording)
-                timer.start()
+            # 等待录音时长
+            time.sleep(wait_for_seconds)
 
-                self.start_recording()
+            # 启动一个定时器，在10秒后调用函数
+            timer = threading.Timer(record_seconds, self.stop_recording)
+            timer.start()
 
-                time.sleep(record_seconds+1)
+            self.start_recording()
 
-                return {
-                    "ui": {
-                        "status": [self.audio_path],
-                        "progress": [0.5 if enable_processing else 0]
-                    },
-                    "result": [self.audio_path]
-                }
-            else:
-                return {"ui": {"error": "no record data"}, "result": ""}
+            time.sleep(record_seconds + 1)
+
+            return {
+                "ui": {
+                    "status": [self.audio_path],
+                    "progress": [0.5]
+                },
+                "result": [self.audio_path]
+            }
         except Exception as e:
             # return (None, f"错误: {str(e)}")
             return {"ui": {"error": "no record data"}, "result": "error"}
+        finally:
+            if remove_file:
+                print('准备删除音频文件')
+                timer = threading.Timer(15, self.remove_audio_file)
+                timer.start()
+            else:
+                self.audio_path = None
+
+    def remove_audio_file(self):
+        print("开始删除文件")
+        os.remove(self.audio_path)
+        self.audio_path = None
 
     # 核心录音控制逻辑 --------------------------------------------------
     def start_recording(self):
@@ -149,6 +160,8 @@ class STTNode:
 
     def __init__(self):
         self.model = None
+        self.model_dir = None
+        self.result_txt = None
 
     @classmethod
     def INPUT_TYPES(s):
@@ -156,9 +169,13 @@ class STTNode:
             "required": {
                 # "audio": ("AUDIO",),
                 "audio_path": ("STRING",),
-                "batch_size_s": ("INT", {
-                    "default": 30
-                })
+                "language": (["auto",  "zh", "en", "yue", "ja", "ko", "nospeech"], {
+                    "default": "auto"
+                }),
+                "use_itn": ("BOOLEAN", {"default": True}),
+                "batch_size_s": ("INT", {"default": 60, "min": 1, "max": 100}),
+                "merge_vad": ("BOOLEAN", {"default": True}),
+                "merge_length_s": ("INT", {"default": 15, "min": 1, "max": 30})
             }
         }
 
@@ -168,34 +185,52 @@ class STTNode:
     CATEGORY = "STT/SenseVoice"
     OUTPUT_NODE = True
 
-    def generate(self, audio_path, batch_size_s):
-        if self.model is None:
-            self.model = AutoModel(
-                model=pre_model_dir,
-                trust_remote_code=True,
-                # remote_code="./model.py",
-                vad_model="fsmn-vad",
-                vad_kwargs={"max_single_segment_time": 30000},
-                disable_update=True,
-                device="cuda:0",
+    def generate(self, audio_path, language, use_itn, batch_size_s, merge_vad, merge_length_s):
+        # 使用示例
+        # comfyui_root = get_comfyui_root()
+        comfyui_root = None
+        print("ComfyUI根目录:", comfyui_root)
+
+        try:
+            if comfyui_root is None:
+                self.model_dir = "iic/SenseVoiceSmall"
+                snapshot_download(model_id="iic/SenseVoiceSmall")
+            else:
+                self.model_dir = os.path.join(now_dir, "models", "checkpoints", "SenseVoiceSmall")
+                snapshot_download(model_id="iic/SenseVoiceSmall", local_dir=self.model_dir)
+
+            if self.model is None:
+                self.model = AutoModel(
+                    model=self.model_dir,
+                    trust_remote_code=True,
+                    # remote_code="./model.py",
+                    vad_model="fsmn-vad",
+                    vad_kwargs={"max_single_segment_time": 30000},
+                    disable_update=True,
+                    device="cuda:0",
+                )
+
+                # print(f"模型加载成功--{audio_path}")
+
+            res = self.model.generate(
+                input=audio_path,
+                cache={},
+                language=language,  # "zh", "en", "yue", "ja", "ko", "nospeech"
+                use_itn=use_itn,
+                batch_size_s=batch_size_s,
+                merge_vad=merge_vad,
+                merge_length_s=merge_length_s,
             )
 
-            # print(f"模型加载成功--{audio_path}")
+            self.result_txt = re.sub(r'<\|.*?\|>', '', res[0]["text"])
+            # print(text)
 
-        res = self.model.generate(
-            input=audio_path,
-            cache={},
-            language="auto",  # "zh", "en", "yue", "ja", "ko", "nospeech"
-            use_itn=True,
-            batch_size_s=batch_size_s,
-            merge_vad=True,
-            merge_length_s=15,
-        )
-
-        text = re.sub(r'<\|.*?\|>', '', res[0]["text"])
-        # print(text)
-
-        return [text]
+            return [self.result_txt]
+        except Exception as e:
+            print(f"sensevoice推理异常: {str(e)}")
+            pass
+        finally:
+            self.result_txt = None
 
 # class ShowTextNode:
 #     @classmethod
@@ -221,7 +256,7 @@ NODE_CLASS_MAPPINGS = {
     "STTNode": STTNode,
     # "ShowTextNode":ShowTextNode
 }
-NODE_DISPLAY_NAME_MAPPINGS = {"VoiceRecorderNode": "voice record", "STTNode": "voice to text"}
+NODE_DISPLAY_NAME_MAPPINGS = {"VoiceRecorderNode": "voice record", "STTNode": "STT By SenseVoice"}
 
 # 主程序入口 ---------------------------------------------------------
 # if __name__ == "__main__":
@@ -230,3 +265,14 @@ NODE_DISPLAY_NAME_MAPPINGS = {"VoiceRecorderNode": "voice record", "STTNode": "v
 #     print("语音录制系统已启动".center(40))
 #     print("="*40)
 #     recorder.generate('/home/fangg/other/save_voice/data_set/zh/TP225/300006.wav', 60)
+
+def get_comfyui_root():
+    # 获取主模块（通常是启动脚本，如main.py）
+    main_module = sys.modules.get('__main__')
+    if main_module and hasattr(main_module, '__file__'):
+        main_path = os.path.abspath(main_module.__file__)
+        root_dir = os.path.dirname(main_path)
+        return root_dir
+    else:
+        # 若无法获取主模块路径，回退到当前工作目录
+        return None
