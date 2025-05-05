@@ -193,8 +193,8 @@ class STTNode:
 
     def generate(self, audio_path, language, use_itn, batch_size_s, merge_vad, merge_length_s):
         # 使用示例
-        # comfyui_root = get_comfyui_root()
-        comfyui_root = None
+        comfyui_root = get_comfyui_root()
+        #comfyui_root = None
         # print("ComfyUI根目录:", comfyui_root)
 
         try:
@@ -202,7 +202,8 @@ class STTNode:
                 self.model_dir = "iic/SenseVoiceSmall"
                 snapshot_download(model_id="iic/SenseVoiceSmall")
             else:
-                self.model_dir = os.path.join(now_dir, "models", "checkpoints", "SenseVoiceSmall")
+                #self.model_dir = os.path.join(now_dir, "models", "checkpoints", "SenseVoiceSmall")
+                self.model_dir = os.path.join(comfyui_root, "models", "checkpoints", "SenseVoiceSmall")
                 snapshot_download(model_id="iic/SenseVoiceSmall", local_dir=self.model_dir)
 
             if self.model is None:
