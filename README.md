@@ -13,7 +13,7 @@ weights will be downloaded from modelscope
 
 
 ```
-#local model diretory, or download by hf
+#local model diretory, or download by hf from (https://huggingface.co/FunAudioLLM/SenseVoiceSmall)
 ./ComfyUI/models/checkpoints/SenseVoiceSmall
 ```
 
