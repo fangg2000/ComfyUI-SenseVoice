@@ -42,7 +42,7 @@ class VoiceRecorderNode:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "folder": ("STRING", {"directory": True, "default": "./ComfyUI/temp"}),
+                "folder": ("STRING", {"directory": True, "default": "./temp"}),
                 "wait_for_seconds": ("INT", {"default": 1, "min": 0, "max": 5}),
                 "sample_rate": ([8000, 16000, 22050, 44100, 48000], {
                     "default": 16000
