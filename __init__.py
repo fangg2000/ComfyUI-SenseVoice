@@ -6,6 +6,8 @@ import time
 import re
 import torch
 import threading
+import random
+import io
 
 from funasr import AutoModel
 # from funasr.utils.postprocess_utils import rich_transcription_postprocess
@@ -19,8 +21,8 @@ now_dir = os.path.dirname(os.path.abspath(__file__))
 # 注册节点
 class VoiceRecorderNode:
     CATEGORY = "fg/Record Node"
-    RETURN_TYPES = ("LIST",)
-    RETURN_NAMES = ("file_path_list",)
+    RETURN_TYPES = ("AUDIO", "LIST")
+    RETURN_NAMES = ("audio", "file_path_list")
     FUNCTION = "process_record"
     OUTPUT_NODE = True
 
@@ -29,7 +31,8 @@ class VoiceRecorderNode:
 
         # 录音控制变量
         self.is_recording = False
-        self.audio_data = []
+        self.audio_data_list = []
+        self.audio_data = None
         self.audio_path = ""
         self.last_press_time = 0
         self.debounce_interval = 0.3  # 优化防抖时间
@@ -43,6 +46,11 @@ class VoiceRecorderNode:
         return {
             "required": {
                 "folder": ("STRING", {"directory": True, "default": "./temp"}),
+                "random_seed": ("INT", {
+                    "default": random.randint(0, 10000000),
+                    "min": 0,
+                    "max": 10000000
+                }),
                 "wait_for_seconds": ("INT", {"default": 1, "min": 0, "max": 5}),
                 "sample_rate": ([8000, 16000, 22050, 44100, 48000], {
                     "default": 16000
@@ -52,7 +60,7 @@ class VoiceRecorderNode:
             },
         }
 
-    def process_record(self, folder, wait_for_seconds, sample_rate, record_seconds, remove_file):
+    def process_record(self, folder, random_seed, wait_for_seconds, sample_rate, record_seconds, remove_file):
         # 采样率
         self.fs = sample_rate
 
@@ -71,18 +79,21 @@ class VoiceRecorderNode:
             self.start_recording()
 
             time.sleep(record_seconds + 1)
+            # random_value = random.randint(0, 100)
 
             return {
                 "ui": {
                     "status": [self.audio_path],
                     "progress": [0.5]
                 },
-                "result": [self.audio_path]
+                "result": (self.audio_data, [self.audio_path])
             }
         except Exception as e:
             # return (None, f"错误: {str(e)}")
-            return {"ui": {"error": "no record data"}, "result": "error"}
+            return {"ui": {"error": "no record data"}, "result": (None, ["error"])}
         finally:
+            self.audio_data_list = None
+            self.audio_data = None
             if remove_file:
                 print('准备删除音频文件')
                 timer = threading.Timer(15, self.remove_audio_file)
@@ -105,7 +116,7 @@ class VoiceRecorderNode:
         if not self.is_recording:
             self.last_press_time = current_time
             self.is_recording = True
-            self.audio_data = []
+            self.audio_data_list = []
             print("🎤 录音开始...")
 
             # 启动音频流
@@ -130,21 +141,21 @@ class VoiceRecorderNode:
                 self.stream.close()
 
             # 保存录音
-            if len(self.audio_data) > 0:
+            if len(self.audio_data_list) > 0:
                 self.save_recording()
             # print("✅ 录音已保存")
 
     def audio_callback(self, indata, frames, time, status):
         """实时音频回调函数"""
         if self.is_recording:
-            self.audio_data.append(indata.copy())
+            self.audio_data_list.append(indata.copy())
 
     # 文件保存逻辑 ------------------------------------------------------
     def save_recording(self):
         """优化的音频保存方法"""
         try:
             # print('开始保存音频数据...')
-            full_recording = np.concatenate(self.audio_data, axis=0)
+            full_recording = np.concatenate(self.audio_data_list, axis=0)
 
             # 生成时间戳
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -157,7 +168,42 @@ class VoiceRecorderNode:
             # print(f"💾 文件已保存到：{os.path.abspath(filename)}")
             print("✅ 录音已保存")
 
+            # 创建一个 BytesIO 缓冲区来保存 WAV 数据
+            # wav_buffer = io.BytesIO()
+            # 写入 WAV 数据到缓冲区
+            # write(wav_buffer, self.fs, full_recording)
+            # 获取二进制数据
+            # binary_wav_data = wav_buffer.getvalue()
+
+            # 假设 full_recording 是 int16 类型的 NumPy 数组，形状是 (T,) 或 (T, 1) 或 (T, 2)
+            # fs = self.fs 一般是 44100 或 48000
+
+            # Step 1: 如果是整数 PCM 格式（如 int16），归一化到 [-1, 1]
+            if full_recording.dtype == np.int16:
+                full_recording = full_recording.astype(np.float32) / 32768.0
+            elif full_recording.dtype == np.int32:
+                full_recording = full_recording.astype(np.float32) / 2147483648.0
+
+            # Step 2: 确保形状为 [1, T] 或 [1, 1, T]（batch=1, channel=1）
+            if len(full_recording.shape) == 1:
+                # 单声道，shape: (T,)
+                full_recording = full_recording[np.newaxis, np.newaxis, :]  # -> (1, 1, T)
+            elif len(full_recording.shape) == 2:
+                if full_recording.shape[1] == 1 or full_recording.shape[1] == 2:
+                    # 单声道或立体声 shape: (T, 1) or (T, 2)
+                    full_recording = np.expand_dims(full_recording, axis=0)  # -> (1, T, 1/2)
+
+            # Step 3: 转换为 PyTorch 张量，并确保是 float32
+            waveform_tensor = torch.tensor(full_recording, dtype=torch.float32)
+
+            # 最终结果
+            # output = {
+            #     'waveform': waveform_tensor,
+            #     'sample_rate': self.fs
+            # }
+
             self.audio_path = filename
+            self.audio_data = (waveform_tensor, self.fs)
         except Exception as e:
             print(f"保存失败: {str(e)}")
 
